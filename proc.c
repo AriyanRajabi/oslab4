@@ -145,14 +145,18 @@ void userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-
+  
   for (int i = 0; i < 10; i++)
   { // initilize sepaphores
     semaphores[i].value = 0;
-    initlock(&semaphores[i].lock, "semaphore" + (char)i);
+     semaphores[i].lock = (struct spinlock*)kalloc();
+        initlock(semaphores[i].lock, "semaphore");
     semaphores[i].count = 0;
+    for(int j=0;j<64;j++){ //64 is NPROC
+      semaphores[i].queue[j] = 0;
+    }
+    
   }
-
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
@@ -554,14 +558,14 @@ void procdump(void)
 
 int sem_init(int i, int v)
 {
-  if (i < 0 || i >= NSEM)
+  if (i < 0 || i >= 10)
     return -1;
 
-  acquire(&semaphores[i].lock);
+  acquire(semaphores[i].lock);
 
   semaphores[i].value = v;
 
-  release(&semaphores[i].lock);
+  release(semaphores[i].lock);
 
   return 0;
 }
@@ -571,19 +575,19 @@ int sem_acquire(int i)
   if (i < 0 || i >= 10)
     return -1;
 
-  acquire(&semaphores[i].lock);
+  acquire(semaphores[i].lock);
 
   while (semaphores[i].value <= 0)
   {
     // Add the process to the queue and sleep.
     semaphores[i].queue[semaphores[i].count++] = myproc();
     myproc()->sem = &semaphores[i];
-    sleep(myproc(), &semaphores[i].lock);
+    sleep(myproc(), semaphores[i].lock);
   }
 
   semaphores[i].value--;
 
-  release(&semaphores[i].lock);
+  release(semaphores[i].lock);
 
   return 0;
 }
@@ -595,7 +599,7 @@ int sem_release(int i)
   if (i < 0 || i >= 10)
     return -1;
 
-  acquire(&semaphores[i].lock);
+  acquire(semaphores[i].lock);
 
   semaphores[i].value++;
 
@@ -612,7 +616,7 @@ int sem_release(int i)
     wakeup(p);
   }
 
-  release(&semaphores[i].lock);
+  release(semaphores[i].lock);
 
   return 0;
 }

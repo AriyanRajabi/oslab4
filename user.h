@@ -37,3 +37,6 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+int sem_init(int,int);
+int sem_acquire(int);
+int sem_release(int);
